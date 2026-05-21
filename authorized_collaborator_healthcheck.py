@@ -34,7 +34,7 @@ import requests
 
 DEFAULT_PORTS = "53,80,443,25,587,465"
 DEFAULT_TIMEOUT = 6.0
-DEFAULT_THREADS = 16
+DEFAULT_THREADS = 50
 
 
 @dataclass
@@ -91,7 +91,7 @@ def parse_args() -> argparse.Namespace:
         default="csv",
         help="导出格式。默认：csv",
     )
-    parser.add_argument("--threads", type=int, default=DEFAULT_THREADS)
+    parser.add_argument("--threads", type=int, default=DEFAULT_THREADS, help=f"工作线程数。默认：{DEFAULT_THREADS}")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
     parser.add_argument(
         "--ports",
@@ -483,12 +483,18 @@ def print_summary(result: CollaboratorHealthResult) -> None:
     for check in result.http_checks:
         scheme = urlparse(check.url).scheme
         http_parts.append(f"{scheme}:{check.status if check.ok else 'ERR'}")
+    polling_parts = []
+    for check in result.polling_http_checks:
+        scheme = urlparse(check.url).scheme
+        polling_parts.append(f"polling_{scheme}:{check.status if check.ok else 'ERR'}")
     failed = ",".join(result.failed_check_names) or "-"
     print(
         f"[{verdict_label(result.verdict)}] {result.host} 全绿={result.all_checks_ok} "
         f"得分={result.passed_checks}/{result.total_checks} 失败={result.failed_checks} "
         f"DNS={result.dns_ok} IP={','.join(result.resolved_ips) or '-'} "
-        f"TCP通过={tcp_ok} 失败项={failed} {' '.join(http_parts)}"
+        f"Polling={result.polling_host} PollingDNS={result.polling_dns_ok} "
+        f"PollingIP={','.join(result.polling_resolved_ips) or '-'} "
+        f"TCP通过={tcp_ok} 失败项={failed} {' '.join(http_parts)} {' '.join(polling_parts)}"
     )
 
 

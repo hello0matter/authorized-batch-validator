@@ -31,7 +31,7 @@ import requests
 
 
 DEFAULT_TIMEOUT = 8.0
-DEFAULT_THREADS = 16
+DEFAULT_THREADS = 50
 DEFAULT_USER_AGENT = "AuthorizedBatchHttpValidator/1.0"
 
 
