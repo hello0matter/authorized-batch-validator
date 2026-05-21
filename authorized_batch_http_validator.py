@@ -51,77 +51,78 @@ class TargetResult:
     server: str | None
     title: str | None
     error: str | None
+    all_ok: bool
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Multithreaded allowlist-only HTTP/HTTPS batch validator."
+        description="仅用于白名单目标的多线程 HTTP/HTTPS 批量验证器。"
     )
-    parser.add_argument("-i", "--input", required=True, help="Input txt/csv file.")
+    parser.add_argument("-i", "--input", required=True, help="TXT/CSV 输入文件。")
     parser.add_argument(
         "-o",
         "--output",
-        help="Output file path. Default: auto-generated CSV next to this script.",
+        help="输出文件路径。不填则在输入文件旁自动生成 CSV。",
     )
     parser.add_argument(
         "--format",
         choices=("csv", "json", "jsonl"),
         default="csv",
-        help="Export format when --output is set.",
+        help="输出格式。",
     )
     parser.add_argument(
         "--threads",
         type=int,
         default=DEFAULT_THREADS,
-        help=f"Worker threads. Default: {DEFAULT_THREADS}",
+        help=f"工作线程数。默认：{DEFAULT_THREADS}",
     )
     parser.add_argument(
         "--timeout",
         type=float,
         default=DEFAULT_TIMEOUT,
-        help=f"Per-request timeout in seconds. Default: {DEFAULT_TIMEOUT}",
+        help=f"单次请求超时（秒）。默认：{DEFAULT_TIMEOUT}",
     )
     parser.add_argument(
         "--scheme",
         choices=("http", "https", "auto"),
         default="auto",
-        help="Scheme to use when input has no scheme. Default: auto.",
+        help="输入没有 scheme 时使用的协议。默认：auto。",
     )
     parser.add_argument(
         "--method",
         choices=("GET", "HEAD"),
         default="GET",
-        help="HTTP method to use. Default: GET.",
+        help="HTTP 方法。默认：GET。",
     )
     parser.add_argument(
         "--column",
         type=int,
         default=0,
-        help="CSV column index to read when input is CSV. Default: 0.",
+        help="输入为 CSV 时读取的列索引。默认：0。",
     )
     parser.add_argument(
         "--delimiter",
         default=",",
-        help="CSV delimiter when input is CSV. Default: comma.",
+        help="输入为 CSV 时的分隔符。默认：逗号。",
     )
     parser.add_argument(
         "--user-agent",
         default=DEFAULT_USER_AGENT,
-        help="User-Agent header value.",
+        help="User-Agent 头值。",
     )
     parser.add_argument(
         "--proxy",
-        help="Optional HTTP(S) proxy, e.g. http://127.0.0.1:8080",
+        help="可选 HTTP(S) 代理，例如 http://127.0.0.1:8080",
     )
     parser.add_argument(
         "--verify-tls",
         action="store_true",
-        help="Verify TLS certificates. Disabled by default for internal labs.",
+        help="验证 TLS 证书。默认关闭。",
     )
     parser.add_argument(
         "--jsonl",
         action="store_true",
-        help="Print JSONL to stdout in addition to any export file.",
+        help="除导出文件外，同时在标准输出打印 JSONL。",
     )
     return parser.parse_args()
 
@@ -257,6 +258,7 @@ def probe_target(
             server=response.headers.get("Server"),
             title=extract_title(body) if body else None,
             error=None,
+            all_ok=dns_ok and response.ok,
         )
     except requests.RequestException as exc:
         elapsed_ms = int((time.perf_counter() - start) * 1000)
@@ -275,32 +277,57 @@ def probe_target(
             server=None,
             title=None,
             error=str(exc),
+            all_ok=False,
         )
 
 
 def export_csv(path: str, results: Iterable[TargetResult]) -> None:
-    fieldnames = list(asdict(next(iter([TargetResult("", "", "", "", False, [], False, None, None, None, None, None, None)]))).keys())
-    rows = [asdict(result) for result in results]
+    fieldnames = http_csv_fieldnames()
     with open(path, "w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
-        for row in rows:
-            row["resolved_ips"] = "|".join(row["resolved_ips"])
-            writer.writerow(row)
+        for result in results:
+            writer.writerow(http_csv_row(result))
 
 
 def http_csv_fieldnames() -> list[str]:
-    return list(
-        asdict(
-            TargetResult("", "", "", "", False, [], False, None, None, None, None, None, None)
-        ).keys()
-    )
+    return [
+        "输入值",
+        "规范化URL",
+        "协议",
+        "主机",
+        "DNS成功",
+        "解析IP列表",
+        "探测成功",
+        "HTTP状态码",
+        "最终URL",
+        "耗时毫秒",
+        "内容类型",
+        "服务器",
+        "标题",
+        "错误",
+        "全绿",
+    ]
 
 
 def http_csv_row(result: TargetResult) -> dict[str, object]:
-    row = asdict(result)
-    row["resolved_ips"] = "|".join(row["resolved_ips"])
-    return row
+    return {
+        "输入值": result.input_value,
+        "规范化URL": result.normalized_url,
+        "协议": result.scheme,
+        "主机": result.host,
+        "DNS成功": result.dns_ok,
+        "解析IP列表": "|".join(result.resolved_ips),
+        "探测成功": result.probe_ok,
+        "HTTP状态码": result.http_status if result.http_status is not None else "",
+        "最终URL": result.final_url or "",
+        "耗时毫秒": result.elapsed_ms if result.elapsed_ms is not None else "",
+        "内容类型": result.content_type or "",
+        "服务器": result.server or "",
+        "标题": result.title or "",
+        "错误": result.error or "",
+        "全绿": result.all_ok,
+    }
 
 
 def export_json(path: str, results: Iterable[TargetResult], jsonl: bool) -> None:
@@ -314,18 +341,30 @@ def export_json(path: str, results: Iterable[TargetResult], jsonl: bool) -> None
 
 
 def print_text(result: TargetResult) -> None:
-    state = "OK" if result.probe_ok else "FAIL"
-    print(f"[{state}] {result.input_value} -> {result.normalized_url}")
+    state = "成功" if result.probe_ok else "失败"
+    print(f"[{state}] {result.input_value} -> {result.normalized_url} 全绿={result.all_ok}")
     print(
-        f"  dns={result.dns_ok} ips={','.join(result.resolved_ips) or '-'} "
-        f"status={result.http_status or '-'} elapsed_ms={result.elapsed_ms or '-'}"
+        f"  DNS={result.dns_ok} IP={','.join(result.resolved_ips) or '-'} "
+        f"状态={result.http_status or '-'} 耗时={result.elapsed_ms or '-'}ms"
     )
     if result.title:
-        print(f"  title={result.title}")
+        print(f"  标题={result.title}")
     if result.server:
-        print(f"  server={result.server}")
+        print(f"  服务器={result.server}")
     if result.error:
-        print(f"  error={result.error}")
+        print(f"  错误={result.error}")
+
+
+def print_batch_summary(results: list[TargetResult]) -> None:
+    total = len(results)
+    success_count = sum(1 for result in results if result.probe_ok)
+    fail_count = total - success_count
+    full_green = sum(1 for result in results if result.all_ok)
+    print("汇总结果")
+    print(f"  总数: {total}")
+    print(f"  全绿: {full_green}")
+    print(f"  成功: {success_count}")
+    print(f"  失败: {fail_count}")
 
 
 def main() -> int:
@@ -340,7 +379,7 @@ def main() -> int:
 
     inputs = load_inputs(args.input, args.column, args.delimiter)
     if not inputs:
-        print("No inputs found.", file=sys.stderr)
+        print("未找到输入。", file=sys.stderr)
         return 1
 
     results: list[TargetResult] = []
@@ -350,7 +389,7 @@ def main() -> int:
         output_path = Path(args.output).resolve()
         output_path.parent.mkdir(parents=True, exist_ok=True)
         args.output = str(output_path)
-        print(f"Writing results to {args.output}")
+        print(f"正在写入结果：{args.output}")
         if args.format == "csv":
             output_handle = output_path.open("w", encoding="utf-8-sig", newline="")
             csv_writer = csv.DictWriter(output_handle, fieldnames=http_csv_fieldnames())
@@ -393,7 +432,8 @@ def main() -> int:
             export_json(str(output_path), results, jsonl=False)
         else:
             export_json(str(output_path), results, jsonl=True)
-    print(f"Saved results to {args.output}")
+    print_batch_summary(results)
+    print(f"结果已保存到：{args.output}")
 
     return 0
 
