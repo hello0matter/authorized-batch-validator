@@ -1,0 +1,11 @@
+﻿输入值,规范化URL,协议,主机,DNS成功,解析IP列表,探测成功,HTTP状态码,最终URL,耗时毫秒,内容类型,服务器,标题,错误,全绿
+52.220.87.115,https://52.220.87.115,https,52.220.87.115,True,52.220.87.115,True,200,https://52.220.87.115/,1306,text/html,Burp Collaborator https://burpcollaborator.net/,,,True
+217.154.124.212,https://217.154.124.212,https,217.154.124.212,True,217.154.124.212,True,200,https://217.154.124.212/,1426,text/html,Burp Collaborator https://burpcollaborator.net/,,,True
+164.90.183.242,https://164.90.183.242,https,164.90.183.242,True,164.90.183.242,True,200,https://164.90.183.242/,1733,text/html,Burp Collaborator https://burpcollaborator.net/,Vaadata's Burp Collaborator,,True
+https://104.248.231.250:8443,https://104.248.231.250:8443,https,104.248.231.250,True,104.248.231.250,True,200,https://104.248.231.250:8443/,1778,text/html,,,,True
+137.184.242.250,https://137.184.242.250,https,137.184.242.250,True,137.184.242.250,True,200,https://137.184.242.250/,1944,text/html,Burp Collaborator https://burpcollaborator.net/,,,True
+https://199.247.7.198:8443,https://199.247.7.198:8443,https,199.247.7.198,True,199.247.7.198,True,200,https://199.247.7.198:8443/,1944,text/html,Burp Collaborator https://burpcollaborator.net/,,,True
+164.92.128.50,https://164.92.128.50,https,164.92.128.50,True,164.92.128.50,True,200,https://164.92.128.50/,1955,text/html,Burp Collaborator https://burpcollaborator.net/,,,True
+170.225.215.14,https://170.225.215.14,https,170.225.215.14,True,170.225.215.14,True,200,https://170.225.215.14/,1959,text/html,Burp Collaborator https://burpcollaborator.net/,,,True
+167.71.68.76,https://167.71.68.76,https,167.71.68.76,True,167.71.68.76,True,200,https://167.71.68.76/,1996,text/html,Burp Collaborator https://burpcollaborator.net/,,,True
+35.182.250.134,https://35.182.250.134,https,35.182.250.134,True,35.182.250.134,True,200,https://35.182.250.134/,2016,text/html,Burp Collaborator https://burpcollaborator.net/,,,True
